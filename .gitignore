@@ -86,4 +86,5 @@ dist-electron/
 /public/music/bin
 
 .codegraph
+.idea
 /cover_cache
