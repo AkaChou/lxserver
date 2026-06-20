@@ -1,0 +1,65 @@
+name: Deploy Web
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'README.md'
+      - '.gitignore'
+      - '.codegraph/**'
+      - 'openspec/**'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - 'README.md'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10.12.1'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🛠 Build
+        run: pnpm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: 🔍 Verify build output
+        run: |
+          if [ ! -d "dist" ] || [ -z "$(ls -A dist)" ]; then
+            echo "❌ dist 目录不存在或为空！"
+            exit 1
+          fi
+          echo "✅ 构建成功，dist 大小：$(du -sh dist | cut -f1)"
+
+      - name: 🚀 Deploy to Server
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PEM_KEY }}
+          ARGS: "-rlgoDzvc -i --delete --info=progress2"
+          SOURCE: "dist/"
+          REMOTE_HOST: ${{ secrets.SERVER_ADDRESS }}
+          REMOTE_PORT: ${{ secrets.SERVER_PORT }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: ${{ secrets.SERVER_TARGET }}
+          SCRIPT_AFTER: |
+            echo "✅ 部署完成: $(date)"
+          SCRIPT_AFTER_REQUIRED: true
+          EXCLUDE: ".user.ini,.env"
